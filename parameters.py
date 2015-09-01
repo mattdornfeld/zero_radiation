@@ -21,3 +21,5 @@ omega = np.array([ (2 * n + 1) * pi / 2 for n in range(nm)])
 
 params = {'nm':nm, 'L':L, 'r_pharynx':r_pharynx, 
 'r_trachea':r_trachea, 'fs':fs, 'T':T}
+
+db_path = '/media/matthew/1f84915e-1250-4890-9b74-4bfd746e2e5a/pressure_up_sweep.db'

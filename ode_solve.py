@@ -36,8 +36,7 @@ def flow(q, t, param):
 
 	return qdot
 
-def vary_pressure(p_range, r_front, r_back):
-	print(r_front)
+def calc_params(p, r_front, r_back):
 	ce = r_pharynx**2 / r_front**2
 	cc = r_front**2 / r_trachea**2
 	le = 0.25 * r_front / r_back
@@ -45,11 +44,17 @@ def vary_pressure(p_range, r_front, r_back):
 	M = np.linalg.inv(inverseM)
 	A = np.dot(M, a)
 	B = np.dot(M, b)
+	params = (p, ce, cc, le, nm, omega, M, A, B)
+
+	return params
+
+def vary_pressure(p_range, r_front, r_back):
+	print(r_front)
 	q = [0 for i in p_range]
 	inits = np.array([0 for n in range(2*nm+1)])
 	for i, p in enumerate(p_range):
 		#print(str(i) + "/" + str(len(p_range)))
-		params = (p, ce, cc, le, nm, omega, M, A, B)
+		params = calc_params(p, r_front, r_back)
 		q[i] = odeint(flow, inits, t, args = (params,) )
 		inits = q[i][-1, :]
 
@@ -68,21 +73,35 @@ def find_r_indices(r_front_range, r_back_range, n_cores):
 
 	return r_indices
 
-db_path = '/media/matthew/1f84915e-1250-4890-9b74-4bfd746e2e5a/pressure_up_sweep.db'
 si = ShelfInterface(db_path)
 si.insert('params', params)
 si.insert('p_range', p_range)
 si.insert('r_front_range', r_front_range)
 si.insert('r_back_range', r_front_range)
-n_cores = 8
-r_indices = find_r_indices(r_front_range, r_back_range, n_cores)
+n_cores = 4
+#r_indices = find_r_indices(r_front_range, r_back_range, n_cores)
+try:
+	for idx in r_indices:
+		q = Parallel(n_jobs=n_cores)(delayed(vary_pressure)
+			(p_range, r_front_range[i[0]], r_back_range[i[1]]) for i in idx)
+		map(si.insert, idx, q)
 
-for idx in r_indices:
-	q = Parallel(n_jobs=n_cores)(delayed(vary_pressure)
-		(p_range, r_front_range[i[0]], r_back_range[i[1]]) for i in idx)
-	map(si.insert, idx, q)
-
-si.close()
+finally:
+	np.save('idx', idx)
+	si.close()
 
 
-	
+p = p_range[20]
+r_front = r_front_range[5]
+r_back = r_back_range[5]
+params = calc_params(p, r_front, r_back)
+inits = np.array([0 for n in range(2*nm+1)])
+q = odeint(flow, inits, t, args = (params,))
+qdot = np.array([flow(_, 0, params) for _ in q])
+T1=8960
+T2=9000
+q0 = q[:,0]
+q0dot = qdot[:,0]
+plot(q0[T1:T2], q0dot[T1:T2])
+
+plt.plot(np.log(q0[7000:9000]-np.mean(q0[7000:9000])),np.log(q0dot[7000:9000]-np.mean(q0[7000:9000]))
